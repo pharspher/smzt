@@ -7,8 +7,9 @@ import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Point
+import android.graphics.PointF
 import android.util.AttributeSet
-import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import com.chichizaza.shenmozhita.solver.Board
@@ -30,9 +31,9 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
     private var pieceSize: Float = 0f
     private var pieceViewList: MutableList<PieceView> = ArrayList()
 
-    private var lifted: PieceView? = null
-    private var liftedGrid: Pair<Int, Int>? = null
-    private var liftOffset: Pair<Int, Int> = Pair(0, 0)
+    private var draggedView: PieceView? = null
+    private var lastGridIdx: Point? = null
+    private var initialTouchOffset = Point(0, 0)
 
     private val paint: Paint by lazy { Paint() }
 
@@ -60,18 +61,23 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
 
     override fun onDraw(canvas: Canvas?) {
         super.onDraw(canvas)
-        canvas?.let {
+        canvas?.run {
             var lifted: PieceView? = null
             for (pieceView in pieceViewList) {
                 if (pieceView.lift) {
                     lifted = pieceView
 
                 } else {
-                    pieceView.draw(it, paint)
+                    pieceView.draw(this, paint)
                 }
             }
-            lifted?.draw(it, paint)
+            lifted?.draw(this, paint)
         }
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        return true
     }
 
     override fun onTouchEvent(event: MotionEvent?): Boolean {
@@ -79,48 +85,25 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
-                if (lifted == null) {
-                    val grid = regressToGrid(event.x, event.y)
-                    liftedGrid = grid
-                    lifted = pieceViewList[grid.first * gridSize.width + grid.second]
-                    lifted?.let {
-                        it.lift = true
-                        liftOffset = Pair((it.centerX - event.x).toInt(), (it.centerY - event.y).toInt())
-                    }
+                if (draggedView == null) {
+                    startDragging(event.x, event.y)
                 }
             }
 
             MotionEvent.ACTION_MOVE -> {
-                lifted?.let {
-                    if (event.x < 0 || event.y < 0 || event.x >= viewSize.width || event.y >= viewSize.height) {
-                        return false
-                    }
-                    it.centerX = event.x + liftOffset.first
-                    it.centerY = event.y + liftOffset.second
+                draggedView?.takeIf {
+                    event.x >= 0 && event.y >= 0 &&
+                            event.x < viewSize.width && event.y < viewSize.height
 
-                    val grid = regressToGrid(event.x, event.y)
-                    liftedGrid?.let {
-                        if (grid.first != it.first || grid.second != it.second) {
-                            Log.d("roger_tag", "current: $grid, lifted: $it")
-                            swapWithAnimation(it, grid) {
-
-                            }
-                            liftedGrid = grid
-                        }
-                    }
+                }?.let {
+                    onDragging(it, event.x, event.y)
                 }
             }
 
             MotionEvent.ACTION_UP -> {
-                lifted?.let {
-                    val grid = regressToGrid(event.x, event.y)
-                    val gridCenter = gridCenter(grid)
-                    it.centerX = gridCenter.first
-                    it.centerY = gridCenter.second
-                    it.lift = false
-                }
-                lifted = null
-                liftedGrid = null
+                draggedView?.run { stopDragging(this, event.x, event.y) } ?: performClick()
+                draggedView = null
+                lastGridIdx = null
 
                 startCrush()
             }
@@ -130,8 +113,39 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
         return true
     }
 
-    private fun regressToGrid(x: Float, y: Float): Pair<Int, Int> {
-        return Pair((y / pieceSize).toInt(), (x / pieceSize).toInt())
+    private fun startDragging(x: Float, y: Float) {
+        lastGridIdx = toGridIndex(x, y).also { pos ->
+            draggedView = pieceViewList[pos.y * gridSize.width + pos.x].also { pieceView ->
+                pieceView.lift = true
+                initialTouchOffset.set((pieceView.centerX - x).toInt(),
+                        (pieceView.centerY - y).toInt())
+            }
+        }
+    }
+
+    private fun onDragging(piece: PieceView, x: Float, y: Float) {
+        piece.centerX = x + initialTouchOffset.x
+        piece.centerY = y + initialTouchOffset.y
+
+        val currentGridIdx = toGridIndex(x, y)
+        lastGridIdx?.takeIf {
+            it.x != currentGridIdx.x || it.y != currentGridIdx.y
+
+        }?.let {
+            swapWithAnimation(it, currentGridIdx)
+            lastGridIdx = currentGridIdx
+        }
+    }
+
+    private fun stopDragging(piece: PieceView, x: Float, y: Float) {
+        val gridCenter = gridCenter(toGridIndex(x, y))
+        piece.centerX = gridCenter.x
+        piece.centerY = gridCenter.y
+        piece.lift = false
+    }
+
+    private fun toGridIndex(x: Float, y: Float): Point {
+        return Point((x / pieceSize).toInt(), (y / pieceSize).toInt())
     }
 
     private fun initBoardView(board: Board) {
@@ -139,73 +153,76 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
         for (row in 0 until board.boardHeight) {
             for (col in 0 until board.boardWidth) {
                 val piece: Piece = data[row][col].p()
-                pieceViewList.add(PieceView(piece, pieceSize * col, pieceSize * row, pieceSize))
+                pieceViewList.add(PieceView(piece, pieceSize * col,
+                        pieceSize * row, pieceSize))
             }
         }
         invalidate()
     }
 
-    private fun swapWithAnimation(swapper: Pair<Int, Int>, swappee: Pair<Int, Int>, callback: () -> Unit) {
-        val swappeePiece = pieceView(swappee)
-        val swappeeCenter = gridCenter(swappee)
-        val liftedCenter = gridCenter(swapper)
-        val animatorX = ValueAnimator.ofFloat(swappeeCenter.first, liftedCenter.first)
-        val animatorY = ValueAnimator.ofFloat(swappeeCenter.second, liftedCenter.second)
-        animatorX.addUpdateListener { animatedValue ->
-            val value: Float = animatedValue.animatedValue as Float
-            swappeePiece.centerX = value
-            invalidate()
-        }
-        animatorY.addUpdateListener { animatedValue ->
-            val value: Float = animatedValue.animatedValue as Float
-            swappeePiece.centerY = value
+    private fun swapWithAnimation(src: Point, dst: Point, onComplete: (() -> Unit)? = null) {
+        val srcCenter = gridCenter(src)
+
+        val dstView = pieceView(dst)
+        val dstCenter = gridCenter(dst)
+
+        val dst2SrcAnimX = ValueAnimator.ofFloat(dstCenter.x, srcCenter.x)
+        dst2SrcAnimX.addUpdateListener {
+            dstView.centerX = it.animatedValue as Float
             invalidate()
         }
 
-        val animatorSet = AnimatorSet()
-        animatorSet.playTogether(animatorX, animatorY)
-        animatorSet.duration = 100
-        animatorSet.addListener(object: AnimatorListenerAdapter() {
+        val dst2SrcAnimY = ValueAnimator.ofFloat(dstCenter.y, srcCenter.y)
+        dst2SrcAnimY.addUpdateListener {
+            dstView.centerY = it.animatedValue as Float
+            invalidate()
+        }
+
+        val animSet = AnimatorSet().setDuration(100)
+        animSet.playTogether(dst2SrcAnimX, dst2SrcAnimY)
+        animSet.addListener(object: AnimatorListenerAdapter() {
             override fun onAnimationEnd(animation: Animator?) {
-                swap(swapper, swappee)
-                callback()
+                swap(src, dst)
+                onComplete?.run { this() }
             }
         })
-        animatorSet.start()
+        animSet.start()
     }
 
-    private fun swap(swapper: Pair<Int, Int>, swappee: Pair<Int, Int>) {
-        val swapperIdx = swapper.first * gridSize.width + swapper.second
-        val swappeeIdx = swappee.first * gridSize.width + swappee.second
-        val tmp = pieceViewList[swapperIdx]
-        pieceViewList[swapperIdx] = pieceViewList[swappeeIdx]
-        pieceViewList[swappeeIdx] = tmp
+    private fun swap(src: Point, dst: Point) {
+        val srcIdx = src.y * gridSize.width + src.x
+        val dstIdx = dst.y * gridSize.width + dst.x
+
+        run {
+            val tmp = pieceViewList[srcIdx]
+            pieceViewList[srcIdx] = pieceViewList[dstIdx]
+            pieceViewList[dstIdx] = tmp
+        }
 
         board?.let {
-            val t = it.boardData[swapper.first][swapper.second]
-            it.boardData[swapper.first][swapper.second] = it.boardData[swappee.first][swappee.second]
-            it.boardData[swappee.first][swappee.second] = t
+            val tmp = it.boardData[src.y][src.x]
+            it.boardData[src.y][src.x] = it.boardData[dst.y][dst.x]
+            it.boardData[dst.y][dst.x] = tmp
         }
     }
 
-    private fun pieceView(grid: Pair<Int, Int>): PieceView {
-        return pieceViewList[grid.first * gridSize.width + grid.second]
+    private fun pieceView(gridIdx: Point): PieceView {
+        return pieceViewList[gridIdx.y * gridSize.width + gridIdx.x]
     }
 
-    private fun gridCenter(grid: Pair<Int, Int>): Pair<Float, Float> {
-        return Pair(pieceSize * grid.second + pieceSize / 2f, pieceSize * grid.first + pieceSize / 2f)
+    private fun gridCenter(gridPos: Point): PointF {
+        return PointF(pieceSize * gridPos.x + pieceSize / 2f,
+                pieceSize * gridPos.y + pieceSize / 2f)
     }
 
     private val crushQueue: LinkedList<Set<Pair<Int, Int>>> = LinkedList()
 
     private fun startCrush() {
         board?.evaluateCombo()?.let { combos ->
-            Log.d("roger_tag", "combos: ${combos.size}")
             for (combo in combos) {
                 crushQueue.offer(combo)
             }
         }
-
         crushNext()
     }
 
@@ -216,14 +233,14 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
                 return
             }
             val first = combo.iterator().next()
-            val initRadius = pieceView(first).radius
+            val initRadius = pieceView(Point(first.second, first.first)).radius
 
             val animator = ValueAnimator.ofFloat(initRadius, 0f)
             animator.duration = 80
             animator.addUpdateListener {
                 val value = it.animatedValue as Float
 
-                combo.map { pieceView(it) }.forEach { it.radius = value }
+                combo.map { pieceView(Point(it.second, it.first)) }.forEach { it.radius = value }
 
                 invalidate()
             }
