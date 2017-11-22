@@ -196,10 +196,10 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
         animSet.playTogether(dst2SrcAnimX, dst2SrcAnimY)
         animSet.addListener(object: AnimatorListenerAdapter() {
             override fun onAnimationEnd(animation: Animator?) {
-                swap(src, dst)
                 onComplete?.run { this() }
             }
         })
+        swap(src, dst)
         animSet.start()
     }
 
