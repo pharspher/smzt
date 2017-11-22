@@ -7,6 +7,8 @@ import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.os.Handler
+import android.os.Looper
 import android.util.AttributeSet
 import android.util.Log
 import android.view.MotionEvent
@@ -14,6 +16,7 @@ import android.view.View
 import com.chichizaza.shenmozhita.solver.Board
 import com.chichizaza.shenmozhita.solver.Piece
 import com.chichizaza.shenmozhita.solver.p
+import java.util.*
 
 class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
 
@@ -113,10 +116,12 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
                     val gridCenter = gridCenter(grid)
                     it.centerX = gridCenter.first
                     it.centerY = gridCenter.second
+                    it.lift = false
                 }
-                lifted?.lift = false
                 lifted = null
                 liftedGrid = null
+
+                startCrush()
             }
         }
 
@@ -174,6 +179,12 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
         val tmp = pieceViewList[swapperIdx]
         pieceViewList[swapperIdx] = pieceViewList[swappeeIdx]
         pieceViewList[swappeeIdx] = tmp
+
+        board?.let {
+            val t = it.boardData[swapper.first][swapper.second]
+            it.boardData[swapper.first][swapper.second] = it.boardData[swappee.first][swappee.second]
+            it.boardData[swappee.first][swappee.second] = t
+        }
     }
 
     private fun pieceView(grid: Pair<Int, Int>): PieceView {
@@ -182,5 +193,47 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
 
     private fun gridCenter(grid: Pair<Int, Int>): Pair<Float, Float> {
         return Pair(pieceSize * grid.second + pieceSize / 2f, pieceSize * grid.first + pieceSize / 2f)
+    }
+
+    private val crushQueue: LinkedList<Set<Pair<Int, Int>>> = LinkedList()
+
+    private fun startCrush() {
+        board?.evaluateCombo()?.let { combos ->
+            Log.d("roger_tag", "combos: ${combos.size}")
+            for (combo in combos) {
+                crushQueue.offer(combo)
+            }
+        }
+
+        crushNext()
+    }
+
+    private fun crushNext() {
+        crushQueue.peek()?.let { combo ->
+            crushQueue.pop()
+            if (combo.isEmpty()) {
+                return
+            }
+            val first = combo.iterator().next()
+            val initRadius = pieceView(first).radius
+
+            val animator = ValueAnimator.ofFloat(initRadius, 0f)
+            animator.duration = 80
+            animator.addUpdateListener {
+                val value = it.animatedValue as Float
+
+                combo.map { pieceView(it) }.forEach { it.radius = value }
+
+                invalidate()
+            }
+            animator.addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator?) {
+                    handler.postDelayed({
+                        crushNext()
+                    }, 150)
+                }
+            })
+            animator.start()
+        }
     }
 }
