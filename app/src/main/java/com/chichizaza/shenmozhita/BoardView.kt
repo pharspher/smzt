@@ -12,6 +12,7 @@ import android.graphics.PointF
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import android.view.animation.AccelerateInterpolator
 import com.chichizaza.shenmozhita.solver.Board
 import com.chichizaza.shenmozhita.solver.Piece
 import com.chichizaza.shenmozhita.solver.p
@@ -30,6 +31,7 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
     private var viewSize: FloatSize = FloatSize(0f, 0f)
     private var pieceSize: Float = 0f
     private var pieceViewList: MutableList<PieceView> = ArrayList()
+    private val crushedList: LinkedList<Point> = LinkedList()
 
     private var draggedView: PieceView? = null
     private var lastGridIdx: Point? = null
@@ -149,6 +151,7 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
     }
 
     private fun initBoardView(board: Board) {
+        pieceViewList.clear()
         val data = board.boardData
         for (row in 0 until board.boardHeight) {
             for (col in 0 until board.boardWidth) {
@@ -227,31 +230,83 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
     }
 
     private fun crushNext() {
-        crushQueue.peek()?.let { combo ->
+        crushQueue.peek()?.takeUnless { combo -> combo.isEmpty() }?.let { combo ->
             crushQueue.pop()
-            if (combo.isEmpty()) {
-                return
-            }
+
+            crushedList.addAll(combo.map { Point(it.second, it.first) })
+
             val first = combo.iterator().next()
             val initRadius = pieceView(Point(first.second, first.first)).radius
 
-            val animator = ValueAnimator.ofFloat(initRadius, 0f)
-            animator.duration = 80
-            animator.addUpdateListener {
-                val value = it.animatedValue as Float
-
-                combo.map { pieceView(Point(it.second, it.first)) }.forEach { it.radius = value }
-
+            val shrinkRadiusAnim = ValueAnimator.ofFloat(initRadius, 0f).setDuration(80)
+            shrinkRadiusAnim.addUpdateListener {
+                val newRadius = it.animatedValue as Float
+                combo.map { pieceView(Point(it.second, it.first)) }.forEach { pieceView ->
+                    pieceView.radius = newRadius
+                }
                 invalidate()
             }
-            animator.addListener(object : AnimatorListenerAdapter() {
+            shrinkRadiusAnim.addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator?) {
+                    combo.map { pieceView(Point(it.second, it.first)) }.forEach { pieceView ->
+                        pieceView.piece = Piece.Crushed.p()
+                    }
+
                     handler.postDelayed({
                         crushNext()
                     }, 150)
                 }
             })
-            animator.start()
+            shrinkRadiusAnim.start()
+        } ?: onCrushComplete()
+    }
+
+    private fun onCrushComplete() {
+        if (!crushedList.isEmpty()) {
+            val dropSteps = board?.crushPositions(crushedList)
+            crushedList.clear()
+
+            dropSteps?.let {
+                val animList: ArrayList<Animator> = ArrayList()
+                for (step in it) {
+                    val startIdx = step.first
+                    val endIdx = step.second
+
+                    val startPos = gridCenter(startIdx)
+                    val endPos = gridCenter(endIdx)
+
+                    val startPiece = pieceView(startIdx)
+
+                    val dropAnim = ValueAnimator.ofFloat(startPos.y, endPos.y).setDuration(250)
+                    dropAnim.interpolator = AccelerateInterpolator()
+                    dropAnim.addUpdateListener {
+                        startPiece.centerY = it.animatedValue as Float
+                        invalidate()
+                    }
+                    dropAnim.addListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(animation: Animator?) {
+                            val srcIdx = startIdx.y * gridSize.width + startIdx.x
+                            val dstIdx = endIdx.y * gridSize.width + endIdx.x
+                            val tmp = pieceViewList[srcIdx]
+                            pieceViewList[srcIdx] = pieceViewList[dstIdx]
+                            pieceViewList[dstIdx] = tmp
+                        }
+                    })
+                    animList.add(dropAnim)
+                }
+
+                val animSet = AnimatorSet()
+                animSet.playTogether(animList)
+                animSet.start()
+                animSet.addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator?) {
+                        startCrush()
+                    }
+                })
+            }
+
+        } else {
+            Board.logBoard(board!!)
         }
     }
 }

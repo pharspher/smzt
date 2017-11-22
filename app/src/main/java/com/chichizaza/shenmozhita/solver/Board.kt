@@ -1,5 +1,6 @@
 package com.chichizaza.shenmozhita.solver
 
+import android.graphics.Point
 import android.util.Log
 import java.util.*
 
@@ -16,25 +17,30 @@ class Board(val boardData: Array<IntArray>) {
             val random = Random()
             for (i in 0 until height) {
                 for (j in 0 until width) {
-                    boardData[i][j] = random.nextInt(6)
+                    boardData[i][j] = 1 + random.nextInt(6)
                 }
             }
             return Board(boardData)
         }
 
         fun logBoard(board: Board) {
+            Log.d(TAG, "--------------")
             for (i in 0 until board.boardHeight) {
                 val builder = StringBuilder()
                 for (j in 0 until board.boardWidth) {
-                    builder.append(board.boardData[i][j]).append(" ")
+                    if (board.boardData[i][j] == Piece.Crushed) {
+                        builder.append(". ")
+                    } else {
+                        builder.append(board.boardData[i][j]).append(" ")
+                    }
                 }
                 Log.d(TAG, builder.toString())
             }
         }
     }
 
-    var boardWidth = Board.defaultBoardWidth
-    var boardHeight = Board.defaultBoardHeight
+    var boardHeight = boardData.size
+    var boardWidth = boardData[0].size
 
     private fun markCombo(boardData: Array<IntArray>): MutableList<MutableSet<Pair<Int, Int>>> {
         val combos: MutableList<MutableSet<Pair<Int, Int>>> = ArrayList()
@@ -43,6 +49,10 @@ class Board(val boardData: Array<IntArray>) {
             var i = 0
             var j = i + 1
             while (i < boardWidth) {
+                if (rowArray[i] == Piece.Crushed) {
+                    i++
+                    continue
+                }
                 if (j < boardWidth && rowArray[i] == rowArray[j]) {
                     j++
                 } else {
@@ -64,6 +74,11 @@ class Board(val boardData: Array<IntArray>) {
             var i = 0
             var j = i + 1
             while (i < boardHeight) {
+                if (colArray[i] == Piece.Crushed) {
+                    i++
+                    continue
+                }
+
                 if (j < boardHeight && colArray[i] == colArray[j]) {
                     j++
                 } else {
@@ -108,6 +123,28 @@ class Board(val boardData: Array<IntArray>) {
             result.add(combos[combos.size - 1])
         }
         return result
+    }
+
+    fun crushPositions(positionList: List<Point>): List<Pair<Point, Point>> {
+        val dropSteps: ArrayList<Pair<Point, Point>> = ArrayList()
+        for (pos in positionList) {
+            boardData[pos.y][pos.x] = Piece.Crushed
+        }
+
+        for (col in 0 until boardWidth) {
+            var write = boardHeight - 1
+            for (row in boardHeight - 1 downTo 0) {
+                if (boardData[row][col] != Piece.Crushed) {
+                    dropSteps.add(Pair(Point(col, row), Point(col, write)))
+                    boardData[write][col] = boardData[row][col]
+                    write--
+                }
+            }
+            for (row in write downTo 0) {
+                boardData[row][col] = Piece.Crushed
+            }
+        }
+        return dropSteps
     }
 
     private fun canBeMerged(set1: MutableSet<Pair<Int, Int>>, set2: MutableSet<Pair<Int, Int>>): Boolean {

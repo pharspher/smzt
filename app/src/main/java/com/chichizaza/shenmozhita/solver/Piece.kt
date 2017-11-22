@@ -2,6 +2,7 @@ package com.chichizaza.shenmozhita.solver
 
 class Piece(var attr: Int, var constraint: Constraint?) {
     companion object {
+        val Crushed = 0
         val Blue = 1
         val Red = 2
         val Green = 3

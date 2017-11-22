@@ -12,13 +12,14 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         val boardView: BoardView = findViewById(boardView)
+        boardView.board = Board.generateRandomBoard(6, 5)
         boardView.gridSize = IntSize(6, 5)
-        boardView.board = Board(arrayOf(
-                intArrayOf(1, 6, 1, 2, 1, 2),
-                intArrayOf(2, 1, 3, 2, 3, 4),
-                intArrayOf(4, 6, 1, 1, 2, 5),
-                intArrayOf(5, 4, 3, 2, 4, 5),
-                intArrayOf(3, 3, 1, 2, 5, 2)))
+//                Board(arrayOf(
+//                intArrayOf(1, 6, 1, 2, 1, 2),
+//                intArrayOf(2, 1, 3, 2, 3, 4),
+//                intArrayOf(4, 6, 1, 1, 2, 5),
+//                intArrayOf(5, 4, 3, 2, 4, 5),
+//                intArrayOf(3, 3, 1, 2, 5, 2)))
 
 //        var data = arrayOf(
 //                intArrayOf(1, 6, 1, 2, 1, 2),

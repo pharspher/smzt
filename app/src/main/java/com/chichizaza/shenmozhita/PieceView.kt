@@ -5,7 +5,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import com.chichizaza.shenmozhita.solver.Piece
 
-class PieceView(private val piece: Piece, x: Float, y: Float, size: Float) {
+class PieceView(var piece: Piece, x: Float, y: Float, size: Float) {
     private val padding: Float = size * 0.05f
 
     var centerX: Float = x + size / 2f
@@ -18,12 +18,13 @@ class PieceView(private val piece: Piece, x: Float, y: Float, size: Float) {
 
     fun draw(canvas: Canvas, paint: Paint) {
         when (piece.attr) {
-            Piece.Blue -> { paint.color = Color.BLUE }
-            Piece.Red -> { paint.color = Color.RED }
-            Piece.Green -> { paint.color = Color.GREEN }
-            Piece.Light -> { paint.color = Color.YELLOW }
-            Piece.Dark -> { paint.color = Color.MAGENTA }
-            Piece.Heart -> { paint.color = Color.parseColor("#FFC0CB") }
+            Piece.Crushed -> { return }
+            Piece.Blue -> { paint.color = Color.parseColor("#52b7e1") }
+            Piece.Red -> { paint.color = Color.parseColor("#d43515") }
+            Piece.Green -> { paint.color = Color.parseColor("#1dca3c") }
+            Piece.Light -> { paint.color = Color.parseColor("#fcdd37") }
+            Piece.Dark -> { paint.color = Color.parseColor("#d540f4") }
+            Piece.Heart -> { paint.color = Color.parseColor("#e473a9") }
         }
 
         if (lift) {
