@@ -7,8 +7,6 @@ import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.os.Handler
-import android.os.Looper
 import android.util.AttributeSet
 import android.util.Log
 import android.view.MotionEvent
@@ -94,6 +92,9 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
 
             MotionEvent.ACTION_MOVE -> {
                 lifted?.let {
+                    if (event.x < 0 || event.y < 0 || event.x >= viewSize.width || event.y >= viewSize.height) {
+                        return false
+                    }
                     it.centerX = event.x + liftOffset.first
                     it.centerY = event.y + liftOffset.second
 
