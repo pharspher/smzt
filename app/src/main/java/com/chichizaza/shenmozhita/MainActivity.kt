@@ -2,6 +2,7 @@ package com.chichizaza.shenmozhita
 
 import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
+import android.widget.TextView
 import com.chichizaza.shenmozhita.R.id.boardView
 import com.chichizaza.shenmozhita.solver.Board
 
@@ -12,8 +13,15 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         val boardView: BoardView = findViewById(boardView)
-        boardView.board = Board.generateRandomBoard(6, 5)
-        boardView.gridSize = IntSize(6, 5)
+        val width = 6
+        val height = 5
+        boardView.board = Board.generateRandomBoard(width, height)
+        boardView.gridSize = IntSize(width, height)
+
+        val comboTextView: TextView = findViewById(R.id.comboTextView)
+        boardView.comboListener = { combo ->
+            comboTextView.text = "${combo}C"
+        }
 //                Board(arrayOf(
 //                intArrayOf(1, 6, 1, 2, 1, 2),
 //                intArrayOf(2, 1, 3, 2, 3, 4),

@@ -13,4 +13,10 @@
         android:background="@android:color/transparent"
         app:layout_constraintBottom_toBottomOf="parent"/>
 
+    <TextView
+        android:id="@+id/comboTextView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:layout_constraintBottom_toTopOf="@id/boardView"/>
+
 </android.support.constraint.ConstraintLayout>

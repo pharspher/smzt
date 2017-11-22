@@ -28,6 +28,8 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
 
     var board: Board? = null
 
+    var comboListener: ((combo: Int) -> Unit)? = null
+
     private var viewSize: FloatSize = FloatSize(0f, 0f)
     private var pieceSize: Float = 0f
     private var pieceViewList: MutableList<PieceView> = ArrayList()
@@ -36,6 +38,14 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
     private var draggedView: PieceView? = null
     private var lastGridIdx: Point? = null
     private var initialTouchOffset = Point(0, 0)
+
+    private var comboCount = 0
+        set(value) {
+            field = value
+            comboListener?.let { listener ->
+                listener(field)
+            }
+        }
 
     private val paint: Paint by lazy { Paint() }
 
@@ -107,6 +117,7 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
                 draggedView = null
                 lastGridIdx = null
 
+                comboCount = 0
                 startCrush()
             }
         }
@@ -232,6 +243,7 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
     private fun crushNext() {
         crushQueue.peek()?.takeUnless { combo -> combo.isEmpty() }?.let { combo ->
             crushQueue.pop()
+            comboCount++
 
             crushedList.addAll(combo.map { Point(it.second, it.first) })
 
@@ -252,7 +264,7 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
                         pieceView.piece = Piece.Crushed.p()
                     }
 
-                    handler.postDelayed({
+                    handler?.postDelayed({
                         crushNext()
                     }, 150)
                 }
