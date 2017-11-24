@@ -1,4 +1,4 @@
-package com.chichizaza.shenmozhita
+package com.chichizaza.shenmozhita.board
 
 import android.graphics.Canvas
 import android.graphics.Color

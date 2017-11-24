@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <com.chichizaza.shenmozhita.BoardView
+    <com.chichizaza.shenmozhita.board.BoardView
         android:id="@+id/boardView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -17,6 +17,19 @@
         android:id="@+id/comboTextView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:layout_constraintBottom_toTopOf="@id/boardView"/>
+        android:text="5c"
+        android:gravity="left"
+        app:layout_constraintBottom_toBottomOf="@+id/solveButton"
+        app:layout_constraintTop_toTopOf="@+id/solveButton"
+        app:layout_constraintEnd_toStartOf="@id/solveButton"
+        app:layout_constraintStart_toStartOf="parent"/>
+
+    <Button
+        android:id="@+id/solveButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Solve"
+        app:layout_constraintBottom_toTopOf="@+id/boardView"
+        app:layout_constraintEnd_toEndOf="parent" />
 
 </android.support.constraint.ConstraintLayout>

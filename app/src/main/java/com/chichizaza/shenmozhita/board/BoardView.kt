@@ -1,18 +1,17 @@
-package com.chichizaza.shenmozhita
+package com.chichizaza.shenmozhita.board
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.AnimatorSet
 import android.animation.ValueAnimator
 import android.content.Context
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Point
-import android.graphics.PointF
+import android.graphics.*
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.AccelerateInterpolator
+import com.chichizaza.shenmozhita.FloatSize
+import com.chichizaza.shenmozhita.IntSize
 import com.chichizaza.shenmozhita.solver.Board
 import com.chichizaza.shenmozhita.solver.Piece
 import com.chichizaza.shenmozhita.solver.p
@@ -29,6 +28,7 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
     var board: Board? = null
 
     var comboListener: ((combo: Int) -> Unit)? = null
+    var showSolution: Boolean = false
 
     private var viewSize: FloatSize = FloatSize(0f, 0f)
     private var pieceSize: Float = 0f
@@ -48,9 +48,13 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
         }
 
     private val paint: Paint by lazy { Paint() }
+    private val solutionPaint: Paint by lazy { Paint() }
 
     init {
         paint.style = Paint.Style.FILL
+        solutionPaint.style = Paint.Style.STROKE
+        solutionPaint.strokeWidth = 5f
+        solutionPaint.color = Color.RED
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -84,6 +88,10 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
                 }
             }
             lifted?.draw(this, paint)
+
+            if (showSolution) {
+                this.drawPath(solutionPath, solutionPaint)
+            }
         }
     }
 
@@ -126,6 +134,39 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
         return true
     }
 
+    private val solutionPath = Path()
+
+    fun showSolution(solution: List<Pair<Int, Int>>) {
+        showSolution = true
+        solutionPath.reset()
+
+        solution.takeUnless { solution.size < 2 }?.let {
+            var screenPos = gridCenter(Point(solution[0].second, solution[0].first))
+            solutionPath.moveTo(screenPos.x, screenPos.y)
+
+            screenPos = gridCenter(Point(solution[1].second, solution[1].first))
+            solutionPath.lineTo(screenPos.x, screenPos.y)
+
+            var first = solution[0]
+            var second = solution[1]
+            var offset = 0
+            for (i in 2 until it.size) {
+                var isH = first.first == second.first
+
+                val pos = gridCenter(Point(solution[i].second, solution[i].first))
+
+                if (isH) {
+                    solutionPath.lineTo(pos.x + offset, pos.y)
+
+                } else {
+                    solutionPath.lineTo(pos.x, pos.y + offset)
+                }
+                offset += 10
+            }
+            invalidate()
+        }
+    }
+
     private fun startDragging(x: Float, y: Float) {
         lastGridIdx = toGridIndex(x, y).also { pos ->
             draggedView = pieceViewList[pos.y * gridSize.width + pos.x].also { pieceView ->
@@ -161,7 +202,7 @@ class BoardView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
         return Point((x / pieceSize).toInt(), (y / pieceSize).toInt())
     }
 
-    private fun initBoardView(board: Board) {
+    fun initBoardView(board: Board) {
         pieceViewList.clear()
         val data = board.boardData
         for (row in 0 until board.boardHeight) {

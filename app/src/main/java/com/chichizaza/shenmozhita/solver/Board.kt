@@ -3,8 +3,11 @@ package com.chichizaza.shenmozhita.solver
 import android.graphics.Point
 import android.util.Log
 import java.util.*
+import kotlin.collections.ArrayList
 
-class Board(val boardData: Array<IntArray>) {
+class Board(var boardData: Array<IntArray>) {
+
+    var tmpBoardData = boardData.copy()
 
     companion object {
         private val TAG = Board::class.java.simpleName
@@ -41,6 +44,12 @@ class Board(val boardData: Array<IntArray>) {
 
     var boardHeight = boardData.size
     var boardWidth = boardData[0].size
+
+    fun copy() :Board {
+        return Board(boardData.copy())
+    }
+
+    fun Array<IntArray>.copy() = Array(size) { get(it).clone() }
 
     private fun markCombo(boardData: Array<IntArray>): MutableList<MutableSet<Pair<Int, Int>>> {
         val combos: MutableList<MutableSet<Pair<Int, Int>>> = ArrayList()
@@ -125,6 +134,43 @@ class Board(val boardData: Array<IntArray>) {
         return result
     }
 
+    fun evaluateComboWithDrop(): Int {
+        for (i in 0 until boardData.size) {
+            for (j in 0 until boardData[i].size) {
+                tmpBoardData[i][j] = boardData[i][j]
+            }
+        }
+
+        var combos: List<Set<Pair<Int, Int>>> = ArrayList()
+        var comboCount = 0
+        var fallCount = 0
+
+        while (true) {
+            combos = evaluateCombo()
+            if (combos.isEmpty()) {
+                break
+            }
+
+            comboCount += combos.size
+            fallCount++
+            crushPositions(combos.flatMap { it.map { Point(it.second, it.first) } })
+        }
+
+//        while (!crushPositions(combos.flatMap { it.map { Point(it.second, it.first) } }).isEmpty()) {
+//            combos = evaluateCombo()
+//            comboCount += combos.size
+//            fallCount++
+//            Log.d("roger_tag", "$fallCount: " + comboCount)
+//        }
+
+        for (i in 0 until boardData.size) {
+            for (j in 0 until boardData[i].size) {
+                boardData[i][j] = tmpBoardData[i][j]
+            }
+        }
+        return comboCount
+    }
+
     fun crushPositions(positionList: List<Point>): List<Pair<Point, Point>> {
         val dropSteps: ArrayList<Pair<Point, Point>> = ArrayList()
         for (pos in positionList) {
@@ -165,13 +211,61 @@ class Board(val boardData: Array<IntArray>) {
         val steps: MutableList<Pair<Int, Int>> = ArrayList()
         for (i in 0 until boardHeight) {
             for (j in 0 until boardWidth) {
-                if (solve(Pair(i, j), -1, steps, 0, 20)) {
+                Log.d("roger_tag", "try ($i, $j)")
+                if (solve(Pair(i, j), -1, steps, 0, 16)) {
                     steps.add(0, Pair(i, j))
-                    return steps
+//                    Log.d("roger_tag", "solved: ${Arrays.toString(steps.toTypedArray())}")
+//                    Log.d("roger_tag", "merged: ${Arrays.toString(mergeSteps(steps).toTypedArray())}")
+                    return mergeSteps(steps)
                 }
             }
         }
-        return steps
+        return mergeSteps(steps)
+    }
+
+    private fun mergeSteps(list: MutableList<Pair<Int, Int>>): List<Pair<Int, Int>> {
+        val result: LinkedList<Pair<Int, Int>> = LinkedList()
+        if (list.size < 2) {
+            return list
+        }
+
+        var offset = 0
+
+        var first = list[0]
+        var second = list[1]
+        result.offer(first)
+        result.offer(second)
+        for (i in 2 until list.size) {
+            if (first.first == second.first && second.first == list[i].first) {
+                result.pollLast()
+                result.offer(list[i])
+            } else if (first.second == second.second && second.second == list[i].second) {
+                result.pollLast()
+                result.offer(list[i])
+            } else {
+//                var isH = second.first == first.first
+//                val last = result.pollLast()
+//                if (isH) {
+//                    result.offer(Pair(last.first, last.second + offset))
+//                    result.offer(Pair(list[i].first, list[i].second + offset))
+//                } else {
+//                    result.offer(Pair(last.first + offset, last.second))
+//                    result.offer(Pair(list[i].first + offset, list[i].second))
+//                }
+                result.offer(list[i])
+                var isH = second.first == first.first
+                if (isH) {
+                    Log.d("roger_tag", "change to vertical")
+                } else {
+                    Log.d("roger_tag", "change to horizontal")
+                }
+                //offset += 1
+            }
+            first = second
+            second = list[i]
+        }
+
+        return result
     }
 
     // left 0, top = 1, right = 2, bottom = 3
@@ -180,7 +274,7 @@ class Board(val boardData: Array<IntArray>) {
             return false
         }
 
-        if (evaluateCombo().size >= 5) {
+        if (evaluateComboWithDrop() >= 6) {
             return true
         }
 
